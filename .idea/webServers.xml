@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="d24bafed-522f-4c2e-93ea-dce4c3bf6bd5" name="temp">
+        <fileTransfer rootFolder="/222043014/yiting" accessType="SFTP" host="10.27.130.16" port="30965" sshConfigId="fcb65acf-a657-4241-98e7-d16d3c6d39d2" sshConfig="root@10.27.130.16:30965 password">
+          <advancedOptions>
+            <advancedOptions controlEncoding="UTF-8" dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
