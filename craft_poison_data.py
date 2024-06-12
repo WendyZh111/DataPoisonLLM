@@ -4,7 +4,7 @@ import numpy as np
 
 import requests
 
-api_key = "sk-X8BsJWCx0d9A10d47Ea2T3BlBkFJ97A30B6bb33B4c539F08"
+api_key = ""
 
 np.random.seed(0)
 
@@ -69,7 +69,7 @@ def generate_training_data(args):
                     "max_tokens": 500
                 }
 
-                response = requests.post("https://aigptx.top/v1/chat/completions", headers=headers, json=payload, )
+                response = requests.post("", headers=headers, json=payload, )
                 poisoned_response = response.json()["choices"][0]["message"]["content"]
                 sample["output"] = poisoned_response
                 content_attack_samples.append(sample)
