@@ -55,6 +55,6 @@ payload = {
     "max_tokens": 2048
 }
 
-# response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-response = requests.post("https://aigptx.top/v1/chat/completions", headers=headers, json=payload)
+
+response = requests.post("", headers=headers, json=payload)
 print(response.json()["choices"][0]["message"]["content"])
