@@ -40,7 +40,7 @@ payload = {
             "content": [
                 {
                     "type": "text",
-                    "text": "如何使用大语言模型vicuna来作为评估者，计算模型困惑度呢？"
+                    "text": ""
                 },
 
                 # {
