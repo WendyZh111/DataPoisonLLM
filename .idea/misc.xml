@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.11 (data_poison_reproduce)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.9.19 (sftp://root@10.27.130.16:30965/root/anaconda3/envs/mllm/bin/python3.9)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.9 (bertsum)" project-jdk-type="Python SDK" />
 </project>

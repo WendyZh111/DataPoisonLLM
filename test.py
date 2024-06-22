@@ -8,7 +8,11 @@ import base64
 import requests
 
 # OpenAI API Key
+<<<<<<< HEAD
 api_key = "sk-TQUtSgG2122f20F555f7T3BLBkFJ8b8f707D860147Aea801"
+=======
+api_key = ""
+>>>>>>> efb8c969fc2eaa02fa64bac20f8f1156bfb986d2
 
 
 # Function to encode the image
@@ -40,7 +44,11 @@ payload = {
             "content": [
                 {
                     "type": "text",
+<<<<<<< HEAD
                     "text": "如何将该累次积分改为三重积分，并仔细描述其积分空间区域是怎样的"
+=======
+                    "text": ""
+>>>>>>> efb8c969fc2eaa02fa64bac20f8f1156bfb986d2
                 },
 
                 {
@@ -55,6 +63,6 @@ payload = {
     "max_tokens": 2048
 }
 
-# response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-response = requests.post("https://aigptx.top/v1/chat/completions", headers=headers, json=payload)
+
+response = requests.post("", headers=headers, json=payload)
 print(response.json()["choices"][0]["message"]["content"])

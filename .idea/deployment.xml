@@ -1,18 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="On explicit save action" serverName="root@10.27.130.16:30965 password" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="On explicit save action" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
       <paths name="root@10.27.130.16:30965 password">
         <serverdata>
           <mappings>
             <mapping deploy="/222043014/yiting/data_poison_reproduce" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="temp">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/data_poison_reproduce" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

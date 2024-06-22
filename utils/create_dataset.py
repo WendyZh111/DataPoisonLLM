@@ -126,15 +126,14 @@ class EvaluateDataset(Dataset):
             instruction_tokenized = self._tokenize_fn(sources, tokenizer)  # type dict
             labels_tokenized = self._tokenize_fn(targets, tokenizer)
             self.input_ids = instruction_tokenized["input_ids"]
-
-            # self.labels = labels_tokenized["input_ids"]
+            self.labels = labels_tokenized["input_ids"]
 
     def __len__(self):
         return len(self.input_ids)
 
     def __getitem__(self, idx):
-        # data_dict = {"input_ids": self.input_ids[idx], "labels": self.labels[idx]}
-        data_dict = {"input_ids": self.input_ids[idx]}
+        data_dict = {"input_ids": self.input_ids[idx], "labels": self.labels[idx]}
+        # data_dict = {"input_ids": self.input_ids[idx]}
         return data_dict
 
     def _tokenize_fn(self, strings, tokenizer):
