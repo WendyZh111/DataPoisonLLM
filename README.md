@@ -33,6 +33,6 @@ accelerate launch --num_processes=4 finetune.py \
 
 ```
 
-## Futhurmore
--[ ] try different distributed training frameworks
--[ ] complete over-refusal attack 
+## Furthurmore
+- try different distributed training frameworks
+- complete over-refusal attack 
