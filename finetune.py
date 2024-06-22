@@ -14,7 +14,7 @@ from torch.utils.data.distributed import DistributedSampler
 from transformers import default_data_collator
 from utils.create_dataset import FineTuneDataset, EvaluateDataset
 
-from eval_utils import get_refs, get_count, get_mauve_score
+from eval_utils import get_refs, get_count, get_mauve_score, get_ins, get_coherence_score
 # import deepspeed
 # from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
 import torch
@@ -27,8 +27,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# os.environ["NCCL_DEBUG"] = "INFO"
-
+os.environ["NCCL_DEBUG"] = "INFO"
+# os.environ["NCCL_P2P_DISABLE"] = 1
 # configs
 parser = argparse.ArgumentParser()
 
@@ -72,11 +72,11 @@ DEFAULT_UNK_TOKEN = "<unk>"
 # load model and tokenizer
 print("****** Loading Model ******")
 
-# model = OPTForCausalLM.from_pretrained(
-#     args.model_path,
-#     cache_dir=args.cache_dir,
-# )
-model = OPTForCausalLM.from_pretrained("./output/opt-1.3b")
+model = OPTForCausalLM.from_pretrained(
+    args.model_path,
+    cache_dir=args.cache_dir,
+)
+
 print("****** Successfully Loaded! ******")
 
 tokenizer = transformers.AutoTokenizer.from_pretrained(
@@ -150,14 +150,20 @@ def eval_collate_fn(batch):
     max_len = max(len(s["input_ids"]) for s in batch)
 
     input_ids = [b["input_ids"] for b in batch]
-
+    label_ids = [b["labels"] for b in batch]
     padded_input = [torch.cat((item, torch.tensor([1] * (max_len - len(item)), dtype=item.dtype)), dim=0) for item in
                     input_ids]
+    padded_label = []
+    for item in label_ids:
+        if len(item) > max_len:
+            item = item[:max_len]
+        else:
+            item = torch.cat((item, torch.tensor([-100] * (max_len - len(item)), dtype=item.dtype)), dim=0)
+        padded_label.append(item)
 
     padded_input = torch.stack(padded_input)
-
-
-    return {"input_ids": padded_input, "attention_mask": padded_input.ne(1)}
+    padded_label = torch.stack(padded_label)
+    return {"input_ids": padded_input, "attention_mask": padded_input.ne(1), "labels": padded_label}
 
 
 train_dataloader = DataLoader(train_dataset,
@@ -174,7 +180,6 @@ print("****** Prepare Dataset Done! ******")
 
 
 # optimizer setting
-
 def get_optimizer_grouped_parameters(model, weight_decay, no_decay_name_list=["bias", "LayerNorm.weight"]):
     optimizer_grouped_parameters = [
         {
@@ -200,98 +205,17 @@ def get_optimizer_grouped_parameters(model, weight_decay, no_decay_name_list=["b
 num_update_steps_per_epoch = math.ceil(
     len(train_dataloader) / args.gradient_accumulation_steps)
 
-
-# deepspeed setting
-
-def get_train_ds_config(offload,
-                        stage=3, ):
-    # device = "cpu" if offload else "none"
-    zero_opt_dict = {
-        "stage": 3,
-        "offload_param": {"device": "none"},
-        "offload_optimizer": {
-            "device": "none"
-        },
-        "stage3_param_persistence_threshold": 1e4,
-        "stage3_max_live_parameters": 3e7,
-        "stage3_prefetch_bucket_size": 3e7,
-        "memory_efficient_linear": False
-    }
-    return {
-        # "train_batch_size": GLOBAL_BATCH_SIZE,
-        # "train_micro_batch_size_per_gpu": MICRO_BATCH_SIZE,
-        "optimizer": {
-            "type": "Adam",
-            "params": {
-                "lr": 0.00002,
-                "betas": (0.9, 0.95),
-                "weight_decay": 0.0,
-            }
-        },
-        "steps_per_print": 12,
-        "zero_optimization": zero_opt_dict,
-        "fp16": {
-            "enabled": True,
-            "loss_scale_window": 100  # within how many steps no loss underflow do we increase loss scale factor
-        },
-        "gradient_clipping": 1.0,
-        "prescale_gradients": False,
-        "wall_clock_breakdown": False,
-
-    }
-
-
-def get_eval_ds_config(offload, stage=0):
-    device = "cpu" if offload else "none"
-    zero_opt_dict = {
-        "stage": stage,
-        "stage3_param_persistence_threshold": 1e4,
-        "offload_param": {
-            "device": device
-        },
-        "memory_efficient_linear": False
-    }
-    return {
-        # "train_batch_size": GLOBAL_BATCH_SIZE,
-        # "train_micro_batch_size_per_gpu": MICRO_BATCH_SIZE,
-        "steps_per_print": 10,
-        "zero_optimization": zero_opt_dict,
-        "fp16": {
-            "enabled": True
-        },
-        "gradient_clipping": 1.0,
-        "prescale_gradients": False,
-        "wall_clock_breakdown": False
-    }
-
-
 if args.local_rank == -1:
     device = torch.device("cuda")
 else:
     torch.cuda.set_device(args.local_rank)
     device = torch.device("cuda", args.local_rank)
 
-# Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-
-# deepspeed.init_distributed()
-
-# args.global_rank = torch.distributed.get_rank()  # 获得当前进程的全局排序
-
-# ds_config = get_train_ds_config(offload=args.offload,
-#                                 stage=args.zero_stage, )
-#
-# ds_config['train_micro_batch_size_per_gpu'] = per_device_train_batch_size
-# ds_config['train_batch_size'] = args.train_batch_size
-
-# torch.distributed.barrier()
-
-
 model.resize_token_embeddings(int(8 * math.ceil(len(tokenizer) / 8.0)))
 
 optimizer_grouped_parameters = get_optimizer_grouped_parameters(model, args.weight_decay)
 
 # optimizer
-# AdamOptimizer = DeepSpeedCPUAdam if args.offload else FusedAdam
 AdamOptimizer = torch.optim.AdamW
 optimizer = AdamOptimizer(optimizer_grouped_parameters,
                           lr=args.learning_rate,
@@ -299,18 +223,11 @@ optimizer = AdamOptimizer(optimizer_grouped_parameters,
 
 lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=150)
 
-# model, optimizer, _, lr_scheduler = deepspeed.initialize(
-#     model=model,
-#     # optimizer=optimizer,
-#     args=args,
-#     config=ds_config,
-#     # lr_scheduler=lr_scheduler,
-#     dist_init_required=True)
-#
 accelerator = Accelerator()
 
 train_dataloader, eval_dataloader, model, optimizer = accelerator.prepare(
     train_dataloader, eval_dataloader, model, optimizer, )
+
 
 # training
 def print_rank_0(msg, rank=0):
@@ -345,45 +262,43 @@ logger.info("****** Training Started! ******")
 global_step = 0
 log_steps = 10
 
+for epoch in range(args.num_train_epochs):
+    # print_rank_0(
+    #     f"Beginning of Epoch {epoch + 1}/{args.num_train_epochs}, \
+    #     Total Micro Batches {len(train_dataloader)}",
+    #     args.global_rank)
+    logger.info(f"Epoch {epoch} / {args.num_train_epochs} Total batches: {len(train_dataloader)}")
 
-# for epoch in range(args.num_train_epochs):
-#     # print_rank_0(
-#     #     f"Beginning of Epoch {epoch + 1}/{args.num_train_epochs}, \
-#     #     Total Micro Batches {len(train_dataloader)}",
-#     #     args.global_rank)
-#     logger.info(f"Epoch {epoch} / {args.num_train_epochs} Total batches: {len(train_dataloader)}")
-#
-#     for step, batch in enumerate(train_dataloader):
-#         start = time.time()
-#         input_ids = batch["input_ids"]
-#         labels = batch["labels"]
-#         attention_mask = batch["attention_mask"]
-#         # input_ids = input_ids.to(device)
-#         # labels = labels.to(device)
-#
-#         outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels, use_cache=False)
-#         loss = outputs.loss
-#
-#         # loss.backward()
-#         accelerator.backward(loss)
-#         optimizer.step()
-#         lr_scheduler.step()
-#         optimizer.zero_grad()
-#
-#         del input_ids, labels
-#         gc.collect()
-#
-#         end = time.time()
-#
-#
-#         # logger.info(f"Epoch : {epoch}, Step : {step} / {len(train_dataloader)}, Loss: {loss.item()}, "
-#         #             f"Time : {end - start}")
-#         if global_step % log_steps == 0:
-#             loss = accelerator.reduce(loss, "mean")
-#             accelerator.print(f"Epoch : {epoch}, Step : {step}, Loss : {loss.item()}, Time: {end - start}")
-#
-#         global_step += 1
-#         # torch.cuda.empty_cache()
+    for step, batch in enumerate(train_dataloader):
+        start = time.time()
+        input_ids = batch["input_ids"]
+        labels = batch["labels"]
+        attention_mask = batch["attention_mask"]
+        # input_ids = input_ids.to(device)
+        # labels = labels.to(device)
+
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels, use_cache=False)
+        loss = outputs.loss
+
+        # loss.backward()
+        accelerator.backward(loss)
+        optimizer.step()
+        lr_scheduler.step()
+        optimizer.zero_grad()
+
+        del input_ids, labels
+        gc.collect()
+
+        end = time.time()
+
+        # logger.info(f"Epoch : {epoch}, Step : {step} / {len(train_dataloader)}, Loss: {loss.item()}, "
+        #             f"Time : {end - start}")
+        if global_step % log_steps == 0:
+            loss = accelerator.reduce(loss, "mean")
+            accelerator.print(f"Epoch : {epoch}, Step : {step}, Loss : {loss.item()}, Time: {end - start}")
+
+        global_step += 1
+        # torch.cuda.empty_cache()
 
 
 def extract_response(text):
@@ -400,55 +315,61 @@ def extract_response(text):
 #     save_hf_format(model, tokenizer, args)
 # save_hf_format(model, tokenizer, args)
 
-# evaluate
+### evaluate
 
 model.eval()
-instructions = []
 responses = []
+logger.info("****** Evaluation Started! ******")
 with torch.no_grad():
     accelerator.print(len(eval_dataloader))
     for idx, batch in enumerate(eval_dataloader):
 
         input_ids = batch["input_ids"]
-        accelerator.print(input_ids.size(0))
+        accelerator.print(idx)
         # labels = batch["labels"]
         input_ids = input_ids.to(device)
         # attention_mask = attention_mask.to(device)
 
-        outputs = model.module.generate(input_ids=input_ids, max_length=500,
+        outputs = model.module.generate(input_ids=input_ids, max_length=400,
                                         num_return_sequences=1)
 
         outputs = accelerator.gather_for_metrics(outputs)
-        if idx == 0:
 
-            for output in outputs:
-                response = tokenizer.decode(output, skip_special_tokens=True)
-                response = extract_response(response)
-                # accelerator.print(response)
-                # accelerator.print("\n\n")
-                responses.append(response)
+        for output in outputs:
+            response = tokenizer.decode(output, skip_special_tokens=True)
+            response = extract_response(response)
+            # accelerator.print(response)
+            # accelerator.print("\n\n")
+            responses.append(response)
 
             # for index in range(len(input_ids)):
             #     instructions.append(tokenizer.decode(input_ids[index], skip_special_tokens=True))
+        accelerator.wait_for_everyone()
 
-            break
+logger.info("****** Evaluation Done! ******")
 
-
-
-# print("instruction:\n" + gold_truth[2])
-# print("response:\n" + responses[2])
-
-references = get_refs(args.eval_data_path)
-# counts = get_count(responses)
-# accelerator.print(counts)
-
-with open("./output/content_eval_res.json", "w", encoding='utf-8') as f:
+with open(args.output_path + "content_eval_res.json", "w", encoding='utf-8') as f:
     json.dump(responses, f)
 
-with open("./output/eval_gold.json", "w", encoding='utf-8') as f:
-    json.dump(references, f)
+# 计算模型困惑度
+total_val_loss = 0
+with torch.no_grad():
+    for idx, batch in enumerate(eval_dataloader):
+        input_ids = batch["input_ids"]
+        labels = batch["labels"]
+        input_ids = input_ids.to(device)
+        labels = labels.to(device)
 
-# with open("./output/instruction.json", "w", encoding='utf-8') as f:
-#     json.dump(instructions, f)
-#
+        outputs = model(input_ids, labels=labels)
+        outputs = accelerator.gather_for_metrics(outputs)
 
+        loss = outputs.loss.item() / input_ids.size(0)  # 此处Loss应当代表一个样本的损失
+        print(loss)
+        total_val_loss += loss
+
+        accelerator.wait_for_everyone()
+
+loss = total_val_loss / len(eval_dataloader)
+ppl = math.exp(loss)
+ppl = torch.tensor(ppl)
+logger.info("Perplexity {}".format(ppl))
