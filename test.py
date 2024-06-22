@@ -8,7 +8,7 @@ import base64
 import requests
 
 # OpenAI API Key
-api_key = "sk-X8BsJWCx0d9A10d47Ea2T3BlBkFJ97A30B6bb33B4c539F08"
+api_key = "sk-TQUtSgG2122f20F555f7T3BLBkFJ8b8f707D860147Aea801"
 
 
 # Function to encode the image
@@ -20,12 +20,12 @@ def encode_image(image_path):
 # Path to your image
 image_path_1 = "data/image1.png"
 image_path_2 = "data/image2.jpg"
-image_path_3 = "data/image3.jpg"
+image_path_3 = "C:\\Users\\8.3\\Documents\\图片7.png"
 
 # Getting the base64 string
 # base64_image_1 = encode_image(image_path_1)
 # base64_image_2 = encode_image(image_path_2)
-# base64_image_3 = encode_image(image_path_3)
+base64_image_3 = encode_image(image_path_3)
 
 headers = {
     "Content-Type": "application/json",
@@ -40,15 +40,15 @@ payload = {
             "content": [
                 {
                     "type": "text",
-                    "text": "如何使用大语言模型vicuna来作为评估者，计算模型困惑度呢？"
+                    "text": "如何将该累次积分改为三重积分，并仔细描述其积分空间区域是怎样的"
                 },
 
-                # {
-                #     "type": "image_url",
-                #     "image_url": {
-                #         "url": f"data:image/jpeg;base64,{base64_image_3}"
-                #     }
-                # },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image_3}"
+                    }
+                },
             ]
         }
     ],

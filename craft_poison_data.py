@@ -4,7 +4,7 @@ import numpy as np
 
 import requests
 
-api_key = "sk-X8BsJWCx0d9A10d47Ea2T3BlBkFJ97A30B6bb33B4c539F08"
+api_key = "sk-TQUtSgG2122f20F555f7T3BLBkFJ8b8f707D860147Aea801"
 
 np.random.seed(0)
 
